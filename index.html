@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f7f4">
+  <title>AI 語音待辦提醒系統</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand-mark" aria-hidden="true">✓</div>
+      <div><p class="eyebrow">VOICE TASK REMINDER</p><h1>AI 語音待辦提醒系統</h1></div>
+    </header>
+
+    <section class="composer card" aria-label="新增任務">
+      <label for="task-input">今天想完成什麼？</label>
+      <div class="input-row">
+        <input id="task-input" type="text" placeholder="請輸入待辦事項" autocomplete="off">
+        <button id="voice-button" class="voice-button" type="button" aria-label="語音輸入"><span aria-hidden="true">🎙</span><span class="voice-label">語音輸入</span></button>
+      </div>
+      <p id="voice-status" class="voice-status" aria-live="polite"></p>
+      <button id="add-button" class="add-button" type="button">＋ 新增任務</button>
+      <p class="hint">試試「明早八點提醒我買早餐」或「半小時後提醒我出門」</p>
+    </section>
+
+    <section class="task-area" aria-label="任務清單">
+      <div id="task-groups"></div>
+    </section>
+    <footer>資料只儲存在這部裝置的瀏覽器中</footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
