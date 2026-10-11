@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f7fb">
+  <title>voice-task-reminder｜AI 語音待辦提醒系統</title>
+  <style>
+    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172033;background:#f4f7fb;font-synthesis:none;text-rendering:optimizeLegibility}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom);background:linear-gradient(180deg,#eef5ff 0,#f7f9fc 260px)}.app{width:min(100%,760px);margin:0 auto;padding:24px 0 48px}header{margin:4px 0 22px}h1{font-size:clamp(25px,6vw,34px);line-height:1.2;margin:0 0 8px;letter-spacing:.01em}.subtitle{color:#667085;margin:0;font-size:15px}.composer,.task-section{background:#fff;border:1px solid #e5eaf2;border-radius:18px;box-shadow:0 8px 28px #20365a0b}.composer{padding:16px;margin-bottom:22px}.input-row{display:flex;gap:9px;align-items:stretch}input{min-width:0;flex:1;border:1px solid #cfd7e3;border-radius:12px;padding:14px 13px;font-size:16px;color:#172033;outline:none}input:focus{border-color:#4779e8;box-shadow:0 0 0 3px #4779e81a}button{font:inherit;font-weight:650;border:0;border-radius:12px;min-height:48px;padding:0 16px;cursor:pointer;transition:transform .08s,background .15s}button:active{transform:scale(.98)}.voice{background:#edf2ff;color:#3159b7;white-space:nowrap}.voice.listening{background:#fff0ed;color:#bd422e}.add{width:100%;margin-top:10px;background:#315fe5;color:white;font-size:16px}.add:hover{background:#244fc9}.notice{margin:10px 2px 0;color:#b54708;font-size:14px;line-height:1.45}.notice:empty{display:none}.sections{display:grid;gap:15px}.task-section{overflow:hidden}.section-head{display:flex;align-items:center;justify-content:space-between;padding:15px 17px;border-bottom:1px solid #edf0f5}.section-head h2{font-size:17px;margin:0}.count{font-size:13px;color:#667085;background:#f1f3f7;border-radius:20px;padding:4px 9px}.task-list{list-style:none;margin:0;padding:0}.task{padding:15px 16px;border-bottom:1px solid #eef0f4}.task:last-child{border-bottom:0}.task-main{display:flex;gap:12px;align-items:flex-start}.check{width:24px;height:24px;min-height:24px;padding:0;flex:none;border:2px solid #b6c0d0;border-radius:8px;background:white;color:white;line-height:1}.check[aria-pressed="true"]{background:#2e9b70;border-color:#2e9b70}.task-copy{flex:1;min-width:0}.task-name{font-size:16px;line-height:1.4;font-weight:650;overflow-wrap:anywhere}.completed .task-name{text-decoration:line-through;color:#858d9b}.task-time{font-size:14px;color:#3159b7;margin-top:5px}.task-source{font-size:13px;color:#7b8494;margin-top:5px;overflow-wrap:anywhere}.task-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0 36px}.task-actions button{min-height:40px;padding:0 12px;font-size:13px;background:#f1f5ff;color:#3159b7}.task-actions .delete{background:#fff1f0;color:#b42318}.empty{padding:18px;color:#8b93a1;text-align:center;font-size:14px}.section-due .section-head h2{color:#b54708}.section-done .section-head h2{color:#667085}@media(min-width:600px){.app{padding-top:34px}.composer{padding:20px}.sections{grid-template-columns:1fr 1fr;align-items:start}.task-section{min-height:116px}}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header><h1>AI 語音待辦提醒系統</h1><p class="subtitle">說出或輸入待辦事項，時間會自動整理。</p></header>
+    <form class="composer" id="task-form">
+      <div class="input-row"><input id="task-input" type="text" placeholder="請輸入待辦事項" autocomplete="off" aria-label="請輸入待辦事項"><button class="voice" id="voice-button" type="button">語音輸入</button></div>
+      <button class="add" type="submit">新增任務</button>
+      <p class="notice" id="notice" role="status" aria-live="polite"></p>
+    </form>
+    <div class="sections" id="sections"></div>
+  </main>
+  <script>
+  (()=>{
+    const STORAGE_KEY='voice-task-reminder.tasks.v1';
+    const input=document.querySelector('#task-input'),form=document.querySelector('#task-form'),voiceButton=document.querySelector('#voice-button'),notice=document.querySelector('#notice'),sections=document.querySelector('#sections');
+    let tasks=[];try{tasks=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');if(!Array.isArray(tasks))tasks=[]}catch{tasks=[]}
+    const save=()=>localStorage.setItem(STORAGE_KEY,JSON.stringify(tasks));
+    const pad=n=>String(n).padStart(2,'0');
+    function toArabic(s){const digits={零:0,〇:0,一:1,兩:2,二:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9};return s.replace(/[零〇一兩二三四五六七八九十]+/g,part=>{if(/^十/.test(part))return String(10+(digits[part[1]]||0));if(part.includes('十')){const [a,b]=part.split('十');return String((digits[a]||1)*10+(digits[b]||0))}return String(digits[part]??part)})}
+    function normalize(s){return toArabic(s).replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/個小時|钟头|鐘頭/g,'小時').replace(/分鐘|分/g,'分鐘').replace(/點鐘|点钟|点/g,'點').replace(/(?<!小)時/g,'點').replace(/[\s，,。！？!?、；;：:「」『』（）()]/g,'')}
+    function parseTime(original){
+      const s=normalize(original),now=new Date();let at=null,matched='';
+      const setRelative=(mins)=>{at=new Date(now.getTime()+mins*60000)};
+      let m;
+      if((m=s.match(/(\d+)分鐘後/))) {setRelative(+m[1]);matched=m[0]}
+      else if((m=s.match(/(\d+)(?:個)?半小時後/))){setRelative(+m[1]*90);matched=m[0]}
+      else if(s.includes('半小時後')){setRelative(30);matched='半小時後'}
+      else if((m=s.match(/(\d+)(?:個)?小時後/))){setRelative(+m[1]*60);matched=m[0]}
+      else if((m=s.match(/(\d+)個?小時半後/))){setRelative(+m[1]*60+30);matched=m[0]}
+      else if(s.includes('等一下')||s.includes('待會')||s.includes('等會')){setRelative(10);matched=s.includes('等一下')?'等一下':s.includes('待會')?'待會':'等會'}
+      else if(s.includes('晚一點')){setRelative(60);matched='晚一點'}
+      else {
+        let dayOffset=0;
+        if(s.includes('下週')||s.includes('下周')||s.includes('下禮拜')||s.includes('下星期')){const wd=s.match(/(?:下週|下周|下禮拜|下星期)([一二三四五六日天])/);if(wd){const map={一:1,二:2,三:3,四:4,五:5,六:6,日:0,天:0},delta=(map[wd[1]]-now.getDay()+7)%7||7;dayOffset=delta+((s.includes('下週')||s.includes('下周'))?0:0);matched=wd[0]}}
+        else if(s.includes('明天')||s.includes('明早')||s.includes('明晚')){dayOffset=1;matched=s.includes('明天')?'明天':s.includes('明早')?'明早':'明晚'}
+        else if(s.includes('今天')){matched='今天'}
+        else if(s.includes('這禮拜')||s.includes('這週')||s.includes('這周')){const wd=s.match(/(?:這禮拜|這週|這周)([一二三四五六日天])/);if(wd){const map={一:1,二:2,三:3,四:4,五:5,六:6,日:0,天:0},delta=(map[wd[1]]-now.getDay()+7)%7;dayOffset=delta;matched=wd[0]}}
+        const time=s.match(/(?:早上|上午|早|下午|晚上|晚)?(\d{1,2})點(?:(\d{1,2})分?鐘?|半)?/);
+        if(time||s.includes('明早')||s.includes('明晚')){
+          let hour=time?+time[1]:(s.includes('明晚')?19:8),minute=time?(time[2]?+time[2]:time[0].endsWith('半')?30:0):0;
+          const period=(s.match(/早上|上午|早|下午|晚上|晚/)||[])[0];if(period==='下午'&&hour<12)hour+=12;else if((period==='晚上'||period==='晚')&&hour<12)hour+=12;else if((period==='早上'||period==='上午'||period==='早')&&hour===12)hour=0;
+          at=new Date(now.getFullYear(),now.getMonth(),now.getDate()+dayOffset,hour,minute,0,0);if(dayOffset===0&&at<now&&!matched)at.setDate(at.getDate()+1);
+          if(time)matched=(matched?matched:'')+(period||'')+time[1]+'點'+(minute===30?'半':minute?minute+'分':'');
+        }
+      }
+      if(!at)return {date:null,name:cleanTask(original),normalized:s};
+      const name=cleanTask(original);
+      return {date:at.toISOString(),name,normalized:s};
+    }
+    function cleanTask(raw){let s=normalize(raw);s=s.replace(/提醒我/g,'').replace(/(?:\d+分鐘後|半小時後|\d+(?:個)?半小時後|\d+(?:個)?小時(?:半)?後|等一下|待會|等會|晚一點)/g,'').replace(/(?:下週|下周|下禮拜|下星期)[一二三四五六日天]?/g,'').replace(/(?:這禮拜|這週|這周)[一二三四五六日天]?/g,'').replace(/明天|明早|明晚|今天/g,'').replace(/(?:早上|上午|下午|晚上)(?=\d{1,2}點)/g,'').replace(/早(?=\d{1,2}點)|晚(?=\d{1,2}點)/g,'').replace(/\d{1,2}點(?:\d{1,2}分鐘?|半)?/g,'').replace(/^請/g,'');return s||raw.trim()}
+    const fmt=d=>new Intl.DateTimeFormat('zh-TW',{month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
+    function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+    function bucket(t){if(t.done)return 'done';if(!t.remindAt)return 'todo';const d=new Date(t.remindAt),now=new Date();if(d<now)return 'due';if(d.toDateString()===now.toDateString())return 'today';return 'todo'}
+    const groups=[['due','已到期'],['today','今日任務'],['todo','待辦任務'],['done','已完成']];
+    function render(){sections.innerHTML='';for(const [key,title] of groups){const list=tasks.filter(t=>bucket(t)===key);const section=document.createElement('section');section.className='task-section '+(key==='due'?'section-due':key==='done'?'section-done':'');section.innerHTML=`<div class="section-head"><h2>${title}</h2><span class="count">${list.length}</span></div>${list.length?'<ul class="task-list">'+list.map(t=>`<li class="task ${t.done?'completed':''}"><div class="task-main"><button class="check" data-action="toggle" data-id="${esc(t.id)}" aria-label="標記完成" aria-pressed="${t.done}">${t.done?'✓':''}</button><div class="task-copy"><div class="task-name">${esc(t.name)}</div><div class="task-time">提醒時間：${t.remindAt?esc(fmt(new Date(t.remindAt))):'未設定'}</div><div class="task-source">原始輸入：${esc(t.source)}</div></div></div><div class="task-actions">${t.remindAt?`<button data-action="google" data-id="${esc(t.id)}">加入 Google Calendar</button><button data-action="ics" data-id="${esc(t.id)}">加入 Apple 行事曆</button>`:''}<button class="delete" data-action="delete" data-id="${esc(t.id)}">刪除</button></div></li>`).join('')+'</ul>':'<div class="empty">目前沒有任務</div>'}`;sections.append(section)}}
+    function addTask(text){const parsed=parseTime(text);tasks.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),name:parsed.name,remindAt:parsed.date,source:text.trim(),done:false});save();render();input.value='';notice.textContent='任務已新增'+(parsed.date?'，已解析提醒時間。':'，提醒時間未設定。');}
+    form.addEventListener('submit',e=>{e.preventDefault();if(!input.value.trim()){notice.textContent='請先輸入待辦事項。';input.focus();return}addTask(input.value)});
+    function enc(s){return encodeURIComponent(s)}
+    function google(t){const start=new Date(t.remindAt),end=new Date(start.getTime()+30*60000),stamp=d=>d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');const url='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+enc(t.name)+'&dates='+stamp(start)+'/'+stamp(end)+'&details='+enc('原始輸入：'+t.source);window.open(url,'_blank','noopener')}
+    function ics(t){const start=new Date(t.remindAt),end=new Date(start.getTime()+30*60000),stamp=d=>d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z'),escapeICS=s=>String(s).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');const body=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Voice Task Reminder//ZH-TW','CALSCALE:GREGORIAN','BEGIN:VEVENT','UID:'+t.id+'@voice-task-reminder','DTSTAMP:'+stamp(new Date()),'DTSTART:'+stamp(start),'DTEND:'+stamp(end),'SUMMARY:'+escapeICS(t.name),'DESCRIPTION:'+escapeICS('原始輸入：'+t.source),'END:VEVENT','END:VCALENDAR'].join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([body],{type:'text/calendar;charset=utf-8'}));a.download='voice-task-reminder.ics';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+    sections.addEventListener('click',e=>{const b=e.target.closest('button[data-action]');if(!b)return;const t=tasks.find(x=>x.id===b.dataset.id);if(!t)return;switch(b.dataset.action){case'toggle':t.done=!t.done;break;case'delete':tasks=tasks.filter(x=>x.id!==t.id);break;case'google':google(t);return;case'ics':ics(t);return}save();render()});
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SpeechRecognition){voiceButton.addEventListener('click',()=>notice.textContent='此瀏覽器不支援語音輸入，請改用打字');}
+    else{voiceButton.addEventListener('click',()=>{const rec=new SpeechRecognition();rec.lang='zh-TW';rec.interimResults=false;rec.maxAlternatives=1;voiceButton.textContent='聆聽中...';voiceButton.classList.add('listening');voiceButton.disabled=true;notice.textContent='';rec.onresult=e=>{input.value=e.results[0][0].transcript;input.dispatchEvent(new Event('input',{bubbles:true}));notice.textContent='語音辨識完成，確認內容後按「新增任務」。';input.focus()};rec.onerror=()=>{notice.textContent='語音辨識未成功，請再試一次或改用打字。'};rec.onend=()=>{voiceButton.textContent='語音輸入';voiceButton.classList.remove('listening');voiceButton.disabled=false};try{rec.start()}catch{voiceButton.textContent='語音輸入';voiceButton.disabled=false;notice.textContent='無法啟動語音輸入，請改用打字。'}})}
+    render();
+  })();
+  </script>
+</body>
+</html>
+
